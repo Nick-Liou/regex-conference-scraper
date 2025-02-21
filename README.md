@@ -1,7 +1,8 @@
 [![Mypy](https://github.com/Nick-Liou/regex-conference-scraper/actions/workflows/mypy.yml/badge.svg)](https://github.com/Nick-Liou/regex-conference-scraper/actions/workflows/mypy.yml)
 [![Tests](https://github.com/Nick-Liou/regex-conference-scraper/actions/workflows/pytest.yml/badge.svg)](https://github.com/Nick-Liou/regex-conference-scraper/actions/workflows/pytest.yml)
 
-# regex-conference-scraper
+# Natural Language Processing, MSc in Artificial Intelligence and Data Analytics, 2024-25
+Exercise 1
  
  
  
