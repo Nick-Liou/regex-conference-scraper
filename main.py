@@ -30,7 +30,7 @@ def extract_visible_text(url: str) -> Optional[str]:
         text_elements = soup.find_all(string=True)
         visible_texts = filter(is_visible, text_elements)
 
-        return "\n".join(text.strip() for text in visible_texts if text.strip())
+        return " ".join(text.strip() for text in visible_texts if text.strip())
 
     except requests.RequestException as e:
         print(f"Error fetching the webpage: {e}")
@@ -52,15 +52,37 @@ def get_conference_page(url:str) -> str|None:
 
 def extract_dates(text:str) -> list[str]:
     """Extract conference dates using regex."""
+   
+    month = r'(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\.?'
+    day = r'\d{1,2}(?:st|nd|rd|th)?'
+    dash_day = fr'(?:\s?[-–]\s?{day})'
+    year = r'(?:\d{{4}})'
+
+    # Use double {{ }} to work properly with the f string 
+    sub_pattern = r'(\d{1,2})([./])(\d{1,2})(\2\d{2,4})?\b'
     date_patterns = [
-        r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b',
-        r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\.?\s+\d{1,2},?\s+\d{4}\b',
-        r'\b\d{1,2}[/-]\d{1,2}[/-]\d{4}\b',
-        r'\b\d{1,2}\s*(?:st|nd|rd|th)?\s*(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*\d{4}\b'
+        # r'\d{1,2}([./-])\d{1,2}(?:\1\d{2,4})?',
+        fr'{sub_pattern}(\s?-\s?\d{{1,2}}\2\d{{1,2}}(?:\2\d{{2,4}})?)?(?!\s?{month})' , #(Doesn't end with a month)
+        fr'{month}\s?{day}{dash_day}?(?:\s*,?\s*{year})?',
+        fr'{day}{dash_day}?\s?{month}(?:\s*,?\s*{year})?'
     ]
+    
+        # fr'\b{month}\s+\d{1,2},?\s+\d{4}\b',
+        # fr'\b{month}\s+\d{{1,2}},?\s+\d{{4}}\b',
+        # r'\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b',
+        # r'\b\d{1,2}(?P<date_sep>[./-])\d{1,2}(?:${date_sep}\d{2,4})?\b',
+        # r'\b\d{1,2}(?P<date_sep>[./-])\d{1,2}(?:(?P=date_sep)\d{2,4})?\b',
+        # fr'\b\d{{1,2}}\s*(?:st|nd|rd|th)?\s*{month}\s*\d{{4}}\b',
+        # r'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s\d{1,2}\s*(st|nd|rd|th)?\s*([-–]\s*\d{1,2}\s*(st|nd|rd|th)?)?\s*,?\s*(\d{4})?\b',
+        # r'\b\d{1,2}\s*(st|nd|rd|th)?\s*([-–]\s*\d{1,2}\s*(st|nd|rd|th)?)?\s(January|February|March|April|May|June|July|August|September|October|November|December)\s*,?\s*(\d{4})?\b'
+        # fr'\b{month}\s?{day}\b',
+        # fr'\b{month}\s?{day}\s?(?:[-–]\s*{day})?\s*,?\s*{year}?\b',
+        # fr'\b{month}\s?\d{{1,2}}\s?(?:st|nd|rd|th)?\s?(?:[-–]\s*\d{{1,2}}\s*(?:st|nd|rd|th)?)?\s*,?\s*(?:\d{{4}})?\b',
+
     dates = []
     for pattern in date_patterns:
-        dates.extend(re.findall(pattern, text, re.IGNORECASE))
+        # dates.extend(re.findall(pattern, text, re.IGNORECASE))
+        dates.extend([''.join(match) for match in re.findall(pattern, text, re.IGNORECASE)] )
     return dates
 
 
@@ -70,13 +92,19 @@ def main(url: str = "") -> None:
 
     
     print(f"Current URL: {url}  <=========================================")
-    # html_content = get_conference_page(url)
-    # print(html_content)
 
     vis_text = extract_visible_text(url)
-    print(vis_text)
+    # print(vis_text)
     
-    # if html_content:
+    # Extract dates
+    if vis_text:
+        conference_dates = extract_dates(vis_text)
+        print("Extracted Dates:", conference_dates)
+
+    
+    # html_content = get_conference_page(url)
+    # print(html_content)
+    # if vis_text:
     #     soup = BeautifulSoup(html_content, 'html.parser')
     #     text = soup.get_text()
         
@@ -101,7 +129,9 @@ if __name__ == "__main__":
         "https://cp2024.a4cp.org/"
     ]
 
+   
+
     for url in test_urls:
         main(url)
-        break
-
+        print()
+        # break
