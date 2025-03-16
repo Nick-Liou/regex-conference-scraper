@@ -36,9 +36,6 @@ def extract_visible_text(url: str) -> Optional[str]:
         print(f"Error fetching the webpage: {e}")
         return None
 
-# Example usage
-# print(extract_visible_text("https://example.com"))
-
 
 def get_conference_page(url:str) -> str|None:
     """Fetches the main page content of the given conference URL."""
@@ -61,12 +58,12 @@ def extract_dates(text:str) -> list[str]:
     # Use double {{ }} to work properly with the f string 
     sub_pattern = r'(\d{1,2})([./])(\d{1,2})(\2\d{2,4})?\b'
     date_patterns = [
-        # r'\d{1,2}([./-])\d{1,2}(?:\1\d{2,4})?',
         fr'{sub_pattern}(\s?-\s?\d{{1,2}}\2\d{{1,2}}(?:\2\d{{2,4}})?)?(?!\s?{month})' , #(Doesn't end with a month)
         fr'{month}\s?{day}{dash_day}?(?:\s*,?\s*{year})?',
         fr'{day}{dash_day}?\s?{month}(?:\s*,?\s*{year})?'
     ]
     
+        # r'\d{1,2}([./-])\d{1,2}(?:\1\d{2,4})?',
         # fr'\b{month}\s+\d{1,2},?\s+\d{4}\b',
         # fr'\b{month}\s+\d{{1,2}},?\s+\d{{4}}\b',
         # r'\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b',
@@ -86,6 +83,81 @@ def extract_dates(text:str) -> list[str]:
     return dates
 
 
+def get_conference_name(url :str) -> str:
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # Extract the title tag
+    title = soup.title.string if soup.title else "No title found"
+    
+    return title.strip()
+
+def get_full_conference_name(url :str) -> str:
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # Extract the title
+    title = soup.title.string if soup.title else "No title found"
+    
+    # Extract potential abbreviation (e.g., "ICML 2024")
+    # match = re.search(r'\b[A-Z]{2,6}\s?\d{4}\b', title)
+    match = re.search(r'\b[A-Z]{2,6}(?:\s?\d{4})?\b', title)
+    abbreviation = match.group(0) if match else None
+    
+    if not abbreviation:
+        return title.strip()  # Return the title if no abbreviation is found
+    
+    def build_regex(abbreviation:str)->str:
+        words = list(abbreviation)  # Split abbreviation into letters
+        pattern = r""  # Word boundary
+        
+        for i, letter in enumerate(words):
+            if i > 0:
+                pattern += r",?-?\s*(?:(?:on|of|for|and|in)\s+)?"  # Optional connective words
+            pattern += rf"\b{letter}\w+\b"  # Match a word starting with the letter
+
+        pattern += r""  # Word boundary
+        return "(" + pattern + ")"
+
+    abbreviation = abbreviation.split()[0]
+    # print(f"abbreviation = {abbreviation}")
+    # Search for the full name in the page text
+    text = soup.get_text()
+    # pattern = rf'\b({abbreviation})\b\s+\(([^)]+)\)'
+
+    pattern = build_regex(abbreviation)
+    # print("pattern" , pattern)
+    # print("text:" , text)
+
+    matches = [''.join(match) for match in re.findall(pattern, text, re.IGNORECASE)] 
+
+
+    if matches:
+        def clean_text(s:str)->str:
+            return re.sub(r'[\s\xa0]+', ' ', s).strip()  # Replace all whitespace-like chars with a single space
+
+                
+        # Apply cleaning
+        cleaned_strings = [clean_text(s) for s in matches]
+        # print(cleaned_strings)
+
+        from collections import Counter
+
+        def most_frequent_string(strings:list[str]) -> str:
+            # Create a Counter object to count occurrences
+            counter = Counter(strings)
+            
+            # Find the most common element
+            most_common = counter.most_common(1)  # Returns a list of tuples (item, count)
+            
+            return most_common[0][0]  # Return the string with the highest count
+
+        return most_frequent_string(cleaned_strings)
+    
+    return title.strip()
+    
+    
+
 def main(url: str = "") -> None:
     if url == "":
         url = input("Enter the conference website URL: ")
@@ -101,7 +173,8 @@ def main(url: str = "") -> None:
         conference_dates = extract_dates(vis_text)
         print("Extracted Dates:", conference_dates)
 
-    
+    print("Conference Name :", get_full_conference_name(url))
+
     # html_content = get_conference_page(url)
     # print(html_content)
     # if vis_text:
@@ -129,9 +202,209 @@ if __name__ == "__main__":
         "https://cp2024.a4cp.org/"
     ]
 
-   
+    extra_urls = [
+        "https://2024.hci.international/",
+        "https://isqua.org/events/istanbul-2024-international-conference.html",
+        "https://2024.ieee-icra.org/"
+    ]
 
-    for url in test_urls:
-        main(url)
-        print()
+
+
+    
+    # def get_conference_name_h1(url :str) -> str:
+    #     response = requests.get(url)
+    #     soup = BeautifulSoup(response.text, 'html.parser')
+        
+    #     # Find first <h1> tag
+    #     h1_tag = soup.find('h1')
+    #     return h1_tag.text.strip() if h1_tag else "No H1 found"
+    
+
+    # def extract_conference_name(url :str) -> str:
+    #     response = requests.get(url)
+    #     soup = BeautifulSoup(response.text, 'html.parser')
+        
+    #     text = soup.get_text()
+        
+    #     # Find possible conference names using regex
+    #     match = re.search(r'\b[A-Za-z\s]+(Conference|Symposium|Workshop|Summit|Meeting)\b', text, re.IGNORECASE)
+    #     return match.group(0) if match else "No conference name found"
+    
+    # def get_conference_from_meta(url :str) -> str:
+    #     response = requests.get(url)
+    #     soup = BeautifulSoup(response.text, 'html.parser')
+        
+    #     meta_title = soup.find("meta", property="og:title")
+    #     return meta_title["content"] if meta_title else "No meta title found"
+
+
+
+
+
+
+
+    for url in  test_urls:
+    # for url in extra_urls:
+    # for url in["https://sites.google.com/view/cpaior2024"]: 
+        print(f"Url: {url}")
+        print("Conference Name (complex):", get_full_conference_name(url))
+        print(f"\n==================================\n")
+
+        # break
+        # print(get_conference_name_h1(url))
+        # print(extract_conference_name(url))
+        # print(get_conference_from_meta(url))
+
+   
+    # main("https://isqua.org/events/istanbul-2024-international-conference.html")
+    # main("https://2024.ieee-icra.org/")
+
+#     print(extract_dates("""
+    
+# HCI International 2024 Conference homepage
+
+#     Home
+#     About
+#     Submissions
+#     Registration
+#     Program
+#     Accommodation
+#     Exhibition
+
+# HCI INTERNATIONAL 2024
+# 26th International Conference on
+# Human-Computer Interaction
+# Washington Hilton Hotel, Washington DC, USA
+# 29 June - 4 July 2024
+# 40 years of HCI International. Join us in Washington DC to celebrate
+# Photos
+
+# Photos from the Conference
+#  AWARDS
+
+#     Papers/Poster
+#     Student Design Competition
+#     WUD: Design Challenge
+
+# Stay connected
+
+# Experience the Conference also through
+
+# Web App
+
+# Mobile App
+# Program
+
+# including detailed schedule for
+
+#     paper presentations
+#     poster presentations
+#     tutorials
+#     workshops
+
+# Tours
+
+# Explore the US Capital through an exclusive tour
+# CMS
+
+# Submissions and registration are handled through the Conference management System
+# HCI MEDAL FOR SOCIETAL IMPACT
+
+# Recipient: Vicki Hanson
+# Medal to be awarded during the HCII2024 Opening Plenary Session
+# KEYNOTE SPEECH
+
+# "Technological Change for Improving Accessibility"
+
+# by Vicki Hanson
+# Participants attending the Conference ‘virtually’ are offered two complimentary TUTORIAL registrations
+
+# (i) the Distinguished Tutorial T13 “Generative AI: With Great Power Comes Great Responsibility” offered by Ben Shneiderman
+
+# (ii) any other Tutorial of their choice
+# The HCI International (HCII) Conference celebrates the World Usability Day and congratulates the Design Challenge 2023 winners!
+
+# November 9, 2023: On this special day, HCII reaffirms its commitment to prioritizing usability, promoting the creation of digital experiences that are beneficial and empowering for everyone. The HCII2024 sponsors the World Usability Initiative Design Challenge 2023 awards and cordially invites the award winners to receive their prizes and present their work during the conference.
+# Thematic Areas & Affiliated Conferences
+
+#     HCI: Human-Computer Interaction Thematic Area
+#     HIMI: Human Interface and the Management of Information Thematic Area
+#     EPCE: 21st International Conference on Engineering Psychology and Cognitive Ergonomics
+#     AC: 18th International Conference on Augmented Cognition
+#     UAHCI: 18th International Conference on Universal Access in Human-Computer Interaction
+#     CCD: 16th International Conference on Cross-Cultural Design
+#     SCSM: 16th International Conference on Social Computing and Social Media
+#     VAMR: 16th International Conference on Virtual, Augmented and Mixed Reality
+#     DHM: 15th International Conference on Digital Human Modeling & Applications in Health, Safety, Ergonomics & Risk Management
+#     DUXU: 13th International Conference on Design, User Experience and Usability
+#     C&C: 12th International Conference on Culture and Computing
+#     DAPI: 12th International Conference on Distributed, Ambient and Pervasive Interactions
+
+#     HCIBGO: 11th International Conference on HCI in Business, Government and Organizations
+#     LCT: 11th International Conference on Learning and Collaboration Technologies
+#     ITAP: 10th International Conference on Human Aspects of IT for the Aged Population
+#     AIS: 6th International Conference on Adaptive Instructional Systems
+#     HCI-CPT: 6th International Conference on HCI for Cybersecurity, Privacy and Trust
+#     HCI-Games: 6th International Conference on HCI in Games
+#     MobiTAS: 6th International Conference on HCI in Mobility, Transport and Automotive Systems
+#     AI-HCI: 5th International Conference on Artificial Intelligence in HCI
+#     MOBILE: 5th International Conference on Human-Centered Design, Operation and Evaluation of Mobile Communications
+
+#     Call for Participation
+#      Download(153KB)
+
+#     PROCEEDINGS
+
+#     Published by:
+
+# About the Conference
+# Google Scholar H5-Index: 38 (last update May 2024)
+
+# HCI International 2024, jointly with the affiliated Conferences, under the auspices of 21 distinguished international boards, to be held under one management and one registration, will take place at Washington Hilton Hotel, Washington DC, USA.
+# HCII2024 will run as a 'hybrid' conference.
+
+
+# The best contributions will be awarded!
+# The best paper of each of the HCII 2024 Thematic Areas / Affiliated Conferences will be given an award. The best poster extended abstract will also receive an award.
+# World Usability Day - Design Challenge 2023
+
+# HCI International 2024 congratulates the winners and sponsors the awards
+
+#     1 July 2024: The Gold and Silver awards, as well as the Honorable Mention (in lieu of a Bronze award) will be conferred during the Opening Plenary Session
+#     2 July 2024: The three awards winners are cordially invited, with complimentary registration, to present their work in a special hybrid session of the Conference
+
+
+# If you have any requests or inquiries regarding accessibility issues, please contact the Conference Administration
+# HCI INTERNATIONAL 2024
+
+#     Contacts
+#     Links
+#     Privacy policy
+#     Terms and Conditions
+
+# HCII2024 CMS
+
+#     Create your account
+#     Submit proposals
+
+# Contact us
+
+#     Conference Administration
+#     administration@2024.hci.international
+#     Program Administration
+#     program@2024.hci.international
+#     Registration Administration
+#     registration@2024.hci.international
+
+#     Washington Hilton Hotel, Washington DC, USA
+#     29 June - 4 July 2024
+
+# SSL site seal - click to verify
+
+
+#     """))
+
+    # for url in test_urls:
+    #     main(url)
+    #     print()
         # break
