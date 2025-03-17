@@ -299,7 +299,7 @@ if __name__ == "__main__":
         for paragraph in page_text:
             # If the paragraph contains any of the venue-related keywords, return it
             if any(keyword in paragraph.lower() for keyword in venue_keywords):
-                return paragraph.strip()  # Return the paragraph that contains the venue info
+                return str(paragraph.strip())  # Return the paragraph that contains the venue info
 
         # If no venue information is found
         return "Venue information not found"
