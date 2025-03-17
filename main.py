@@ -53,29 +53,25 @@ def extract_dates(text:str) -> list[str]:
     month = r'(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\.?'
     day = r'\d{1,2}(?:st|nd|rd|th)?'
     dash_day = fr'(?:\s?[-–]\s?{day})'
-    year = r'(?:\d{{4}})'
+    year = r'(?:\d{4})'
 
-    # Use double {{ }} to work properly with the f string 
-    sub_pattern = r'(\d{1,2})([./])(\d{1,2})(\2\d{2,4})?\b'
-    date_patterns = [
-        fr'{sub_pattern}(\s?-\s?\d{{1,2}}\2\d{{1,2}}(?:\2\d{{2,4}})?)?(?!\s?{month})' , #(Doesn't end with a month)
-        fr'{month}\s?{day}{dash_day}?(?:\s*,?\s*{year})?',
-        fr'{day}{dash_day}?\s?{month}(?:\s*,?\s*{year})?'
-    ]
+    # # Use double {{ }} to work properly with the f string 
+    # sub_pattern = r'(\d{1,2})([./])(\d{1,2})(\2\d{2,4})?\b'
+    # date_patterns = [
+    #     fr'{sub_pattern}(\s?-\s?\d{{1,2}}\2\d{{1,2}}(?:\2\d{{2,4}})?)?(?!\s?{month})' , #(Doesn't end with a month)
+    #     fr'{month}\s?{day}{dash_day}?(?:\s*,?\s*{year})?',
+    #     fr'{day}{dash_day}?\s?{month}(?:\s*,?\s*{year})?'
+    # ]
     
-        # r'\d{1,2}([./-])\d{1,2}(?:\1\d{2,4})?',
-        # fr'\b{month}\s+\d{1,2},?\s+\d{4}\b',
-        # fr'\b{month}\s+\d{{1,2}},?\s+\d{{4}}\b',
-        # r'\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b',
-        # r'\b\d{1,2}(?P<date_sep>[./-])\d{1,2}(?:${date_sep}\d{2,4})?\b',
-        # r'\b\d{1,2}(?P<date_sep>[./-])\d{1,2}(?:(?P=date_sep)\d{2,4})?\b',
-        # fr'\b\d{{1,2}}\s*(?:st|nd|rd|th)?\s*{month}\s*\d{{4}}\b',
-        # r'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s\d{1,2}\s*(st|nd|rd|th)?\s*([-–]\s*\d{1,2}\s*(st|nd|rd|th)?)?\s*,?\s*(\d{4})?\b',
-        # r'\b\d{1,2}\s*(st|nd|rd|th)?\s*([-–]\s*\d{1,2}\s*(st|nd|rd|th)?)?\s(January|February|March|April|May|June|July|August|September|October|November|December)\s*,?\s*(\d{4})?\b'
-        # fr'\b{month}\s?{day}\b',
-        # fr'\b{month}\s?{day}\s?(?:[-–]\s*{day})?\s*,?\s*{year}?\b',
-        # fr'\b{month}\s?\d{{1,2}}\s?(?:st|nd|rd|th)?\s?(?:[-–]\s*\d{{1,2}}\s*(?:st|nd|rd|th)?)?\s*,?\s*(?:\d{{4}})?\b',
-
+    # Use double {{ }} to work properly with the f string 
+    ref_index = 2
+    sub_pattern = fr'\d{{1,2}}([./])\d{{1,2}}\{ref_index}\d{{2,4}}?'
+    date_patterns = [
+        fr'({sub_pattern}(?:\s?-\s?\d{{1,2}}\{ref_index}\d{{1,2}}(?:\{ref_index}\d{{2,4}})?)?(?!\s?{month}))'       + '|' 
+        fr'({month}\s?{day}{dash_day}?(?:\s*,?\s*{year})?)'                                   + '|' 
+        fr'(\s{day}{dash_day}?\s?{month}(?:\s*,?\s*{year})?)'
+    ]
+          
     dates = []
     for pattern in date_patterns:
         # dates.extend(re.findall(pattern, text, re.IGNORECASE))
@@ -156,7 +152,26 @@ def get_full_conference_name(url :str) -> str:
     
     return title.strip()
     
+
+def get_conference_date(url :str) -> str:
+
+    vis_text = extract_visible_text(url)
+
+    if vis_text:
+        conference_dates = extract_dates(vis_text)
+        # print("All Dates found:", conference_dates)
+    else:
+        return "No date found"
     
+    if len(conference_dates)>1:
+        if conference_dates[0] in conference_dates[1]:
+            return conference_dates[1]
+
+    if conference_dates[0][-1] in ['.' , '/']:
+        return conference_dates[0][:-1]
+
+    return conference_dates[0]
+
 
 def main(url: str = "") -> None:
     if url == "":
@@ -164,16 +179,14 @@ def main(url: str = "") -> None:
 
     
     print(f"Current URL: {url}  <=========================================")
+     
 
-    vis_text = extract_visible_text(url)
-    # print(vis_text)
+    print("Conference Date :", get_conference_date(url) ) 
+
+    print("Conference Name :", get_full_conference_name(url))  
     
-    # Extract dates
-    if vis_text:
-        conference_dates = extract_dates(vis_text)
-        print("Extracted Dates:", conference_dates)
-
-    print("Conference Name :", get_full_conference_name(url))
+    
+    # <=====================================================
 
     # html_content = get_conference_page(url)
     # print(html_content)
@@ -211,49 +224,98 @@ if __name__ == "__main__":
 
 
     
-    # def get_conference_name_h1(url :str) -> str:
+    # def get_venue_from_url(url:str) ->str:
+    #     # Fetch the webpage content
     #     response = requests.get(url)
     #     soup = BeautifulSoup(response.text, 'html.parser')
         
-    #     # Find first <h1> tag
-    #     h1_tag = soup.find('h1')
-    #     return h1_tag.text.strip() if h1_tag else "No H1 found"
-    
+    #     # 1. Check the <title> tag for venue information
+    #     title = soup.title.string if soup.title else ""
+        
+    #     # 2. Check the <meta> tags (e.g., 'og:description' might contain the venue info)
+    #     meta_venue = soup.find("meta", property="og:description")
+    #     meta_venue_content = meta_venue["content"] if meta_venue else ""
+        
+    #     # 3. Search for venue keywords in the page text
+    #     page_text = soup.get_text().lower()
+    #     venue_keywords = ["venue", "location", "conference held at", "event at", "hosted at"]
+        
+    #     # Search for a venue-related phrase
+    #     venue_found = None
+    #     for keyword in venue_keywords:
+    #         if keyword in page_text:
+    #             # Look around the keyword for the venue
+    #             match = re.search(r'({}.*?[A-Za-z\s]+)'.format(re.escape(keyword)), page_text)
+    #             if match:
+    #                 venue_found = match.group(1).strip()
+    #                 break
 
-    # def extract_conference_name(url :str) -> str:
+    #     if venue_found:
+    #         return venue_found
+    #     elif meta_venue_content:
+    #         return meta_venue_content  # Fallback to the meta description
+    #     elif "online" in page_text: 
+    #         return "Online"  # Some conferences are online and might mention that
+    #     else:
+    #         return "Venue information not found"
+
+
+
+    # def get_venue_from_url(url):
+    #     # Fetch the webpage content
     #     response = requests.get(url)
     #     soup = BeautifulSoup(response.text, 'html.parser')
+
+    #     # Extract the page text
+    #     page_text = soup.get_text().lower()
+
+    #     # Look for keywords and try to find the venue
+    #     venue_keywords = [r"will take place in", r"held in", r"at", r"hosted in", r"located in"]
+
+    #     for keyword in venue_keywords:
+    #         # Search for the keyword and capture the venue following it
+    #         match = re.search(r'{}.*?([A-Za-z\s,]+(?:[A-Za-z]+(?:\s+\d{4})?))'.format(re.escape(keyword)), page_text)
+    #         if match:
+    #             return match.group(1).strip()  # Return the venue found
+
+    #     # If no venue information found
+    #     return "Venue information not found"
+
+    def get_venue_from_url(url:str) ->str:
+        # Fetch the webpage content
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
         
-    #     text = soup.get_text()
+        # Extract all text from the page, split into lines
+        paragraphs = soup.find_all(['p', 'div'])  # Common tags that may contain venue info
+        page_text = [para.get_text() for para in paragraphs]
+
+        print("page_text:\n", page_text)
+
+        # Define venue-related keywords to search for
+        venue_keywords = ["venue", "location", "will take place in", "held in", "at", "hosted in", "located in"]
         
-    #     # Find possible conference names using regex
-    #     match = re.search(r'\b[A-Za-z\s]+(Conference|Symposium|Workshop|Summit|Meeting)\b', text, re.IGNORECASE)
-    #     return match.group(0) if match else "No conference name found"
-    
-    # def get_conference_from_meta(url :str) -> str:
-    #     response = requests.get(url)
-    #     soup = BeautifulSoup(response.text, 'html.parser')
-        
-    #     meta_title = soup.find("meta", property="og:title")
-    #     return meta_title["content"] if meta_title else "No meta title found"
+        # Search each paragraph for venue-related keywords
+        for paragraph in page_text:
+            # If the paragraph contains any of the venue-related keywords, return it
+            if any(keyword in paragraph.lower() for keyword in venue_keywords):
+                return paragraph.strip()  # Return the paragraph that contains the venue info
+
+        # If no venue information is found
+        return "Venue information not found"
 
 
-
-
-
-
-
-    for url in  test_urls:
+    # for url in  test_urls:
     # for url in extra_urls:
-    # for url in["https://sites.google.com/view/cpaior2024"]: 
-        print(f"Url: {url}")
-        print("Conference Name (complex):", get_full_conference_name(url))
-        print(f"\n==================================\n")
+    # for url in[
+    #     # "https://ijcai24.org/",
+    #     "http://icaps24.icaps-conference.org/"
+    #     ]: 
+    #     print(f"Url: {url}")
+    #     print("Venue:", get_venue_from_url(url))
+    #     print(f"\n==================================\n")
 
-        # break
-        # print(get_conference_name_h1(url))
-        # print(extract_conference_name(url))
-        # print(get_conference_from_meta(url))
+    #     # break
 
    
     # main("https://isqua.org/events/istanbul-2024-international-conference.html")
@@ -404,7 +466,9 @@ if __name__ == "__main__":
 
 #     """))
 
-    # for url in test_urls:
-    #     main(url)
-    #     print()
+    # main("https://cp2024.a4cp.org/")
+
+    for url in test_urls:
+        main(url)
+        print()
         # break
