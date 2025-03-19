@@ -89,8 +89,10 @@ def get_conference_name(url :str) -> str:
     return title.strip()
 
 def get_full_conference_name(url :str) -> str:
-    response = requests.get(url)
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
+
     
     # Extract the title
     title = soup.title.string if soup.title else "No title found"
@@ -99,7 +101,7 @@ def get_full_conference_name(url :str) -> str:
     # match = re.search(r'\b[A-Z]{2,6}\s?\d{4}\b', title)
     match = re.search(r'\b[A-Z]{2,6}(?:\s?\d{4})?\b', title)
     abbreviation = match.group(0) if match else None
-    
+
     if not abbreviation:
         return title.strip()  # Return the title if no abbreviation is found
     
@@ -109,21 +111,19 @@ def get_full_conference_name(url :str) -> str:
         
         for i, letter in enumerate(words):
             if i > 0:
-                pattern += r",?-?\s*(?:(?:on|of|for|and|in)\s+)?"  # Optional connective words
+                pattern += r",?-?\s*(?:(?:on|of|for|and|in|for the)\s+)?"  # Optional connective words
             pattern += rf"\b{letter}\w+\b"  # Match a word starting with the letter
 
         pattern += r""  # Word boundary
         return "(" + pattern + ")"
 
     abbreviation = abbreviation.split()[0]
-    # print(f"abbreviation = {abbreviation}")
+    print(f"abbreviation = {abbreviation}")
     # Search for the full name in the page text
     text = soup.get_text()
     # pattern = rf'\b({abbreviation})\b\s+\(([^)]+)\)'
 
     pattern = build_regex(abbreviation)
-    # print("pattern" , pattern)
-    # print("text:" , text)
 
     matches = [''.join(match) for match in re.findall(pattern, text, re.IGNORECASE)] 
 
@@ -188,7 +188,7 @@ def find_conference_venue(homepage_url:str) -> str:
         venue_keywords = ['venue', 'location', 'conference-center', 'hotel']
         venue_links = [link for link in links if any(keyword in link.lower() for keyword in venue_keywords)]
         
-        print(f"venue_links: {venue_links}")
+        # print(f"venue_links: {venue_links}")
         if not venue_links:
             return "No venue page found."
         
@@ -234,6 +234,66 @@ def find_conference_venue(homepage_url:str) -> str:
         return f"Error fetching data: {e}"
 
 
+# https://ijcai24.org/register/
+
+def find_fees(url:str)->str:
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    # Find all links on the homepage
+    links = [a['href'] for a in soup.find_all('a', href=True)]
+    
+    # Filter links that likely contain venue information
+    fee_keywords = ['register', 'registation']
+    fee_links = [link for link in links if any(keyword in link.lower() for keyword in fee_keywords)]
+    
+    if not fee_links:
+        return "No fee/registration page found."
+    
+    fee_url = urljoin(url, fee_links[0])  # Join relative URLs
+    print(f"fee_url: {fee_url}")
+
+
+    
+    fee_finder = re.compile(r'\b(?:early[\W]|late|standard|onsite|on-site|main conference|regular|(eetn|non eetn"|epy|non-epy)\s(member))\b', re.IGNORECASE)
+
+    # print(soup.find_all(['table'])[0].get_text())
+
+
+    # tables =  [" ".join(p.stripped_strings) if re.findall(fee_finder,p.get_text()) else "" for p in soup.find_all(['table'])]
+    tables =  [p if re.findall(fee_finder,p.get_text()) else None for p in soup.find_all(['table'])] 
+
+    # print("tabels is " , tables)
+    # print("len of soup.find_all(['table'])" , len(soup.find_all(['table'])))
+    # # If there isn't tables do something else
+    # if tables == [''] and len(tables) == 1:
+    #     print("hiii")
+    #     return " " 
+
+    fees = []
+    for t in tables:
+        if t:
+            fee = []
+            print("\n\nNew table")
+            for row in t.find_all('tr'): 
+
+                row = [td.get_text(strip=True) for td in row.find_all(['td','th'])]
+                # th = [td.get_text(strip=True) for td in row.find_all('th')]
+                # if row is 
+                print(row)
+                if row:
+                    fee.append(row) 
+            fees.append(fee)
+    
+    # print(fees)
+
+    # fees_tables = [string for string in tables]
+
+    # [link for link in links if any(keyword in link.lower() for keyword in venue_keywords)]
+
+
+
+    return ""
 
 def main(url: str = "") -> None:
     if url == "":
@@ -243,11 +303,11 @@ def main(url: str = "") -> None:
     print(f"Current URL: {url}  <=========================================")
      
 
-    print("Conference Date :", get_conference_date(url) ) 
+    # print("Conference Date :", get_conference_date(url) ) 
 
     print("Conference Name :", get_full_conference_name(url))  
 
-    print("Venue:" , find_conference_venue(url))
+    # print("Venue:" , find_conference_venue(url))
     
     
     # <=====================================================
@@ -263,6 +323,14 @@ def main(url: str = "") -> None:
     #     print("Extracted Dates:", conference_dates)
 
 if __name__ == "__main__":
+
+    # find_fees("https://ijcai24.org/register/")
+    # find_fees("https://www.ecai2024.eu/registration")
+    # find_fees("https://aaai.org/aaai-24-conference/registration/")
+
+    # find_fees("https://setn2024.cs.unipi.gr/index.php/fees-registration-3/")
+
+    
 
     # test_urls = [ "https://icml.cc/" , "https://nips.cc/"]
     # Example urls
@@ -287,109 +355,27 @@ if __name__ == "__main__":
 
 
 
-    
-    # def get_venue_from_url(url:str) ->str:
-    #     # Fetch the webpage content
-    #     response = requests.get(url)
-    #     soup = BeautifulSoup(response.text, 'html.parser')
-        
-    #     # 1. Check the <title> tag for venue information
-    #     title = soup.title.string if soup.title else ""
-        
-    #     # 2. Check the <meta> tags (e.g., 'og:description' might contain the venue info)
-    #     meta_venue = soup.find("meta", property="og:description")
-    #     meta_venue_content = meta_venue["content"] if meta_venue else ""
-        
-    #     # 3. Search for venue keywords in the page text
-    #     page_text = soup.get_text().lower()
-    #     venue_keywords = ["venue", "location", "conference held at", "event at", "hosted at"]
-        
-    #     # Search for a venue-related phrase
-    #     venue_found = None
-    #     for keyword in venue_keywords:
-    #         if keyword in page_text:
-    #             # Look around the keyword for the venue
-    #             match = re.search(r'({}.*?[A-Za-z\s]+)'.format(re.escape(keyword)), page_text)
-    #             if match:
-    #                 venue_found = match.group(1).strip()
-    #                 break
+    # for url in  test_urls:
+    # # for url in extra_urls:
+    # # for url in[
+    # #     # "https://ijcai24.org/",
+    # #     # "http://icaps24.icaps-conference.org/",
+    # #     # "https://www.ecai2024.eu/",
+    # #     # "https://aaai.org/aaai-24-conference/"
+    # #     # "https://setn2024.cs.unipi.gr/"
+    # #     # "https://pci2024.uniwa.gr/"
+    # #     # "https://www.aamas2024-conference.auckland.ac.nz/"
+    # #     # "https://kr.org/KR2024/"
+    # #     # "https://sites.google.com/view/cpaior2024"
+    # #     # "https://cp2024.a4cp.org/"
+    # #     ]: 
+    #     print(f"Url: {url}")
+    #     # print("Venue:", get_venue_from_url(url))
 
-    #     if venue_found:
-    #         return venue_found
-    #     elif meta_venue_content:
-    #         return meta_venue_content  # Fallback to the meta description
-    #     elif "online" in page_text: 
-    #         return "Online"  # Some conferences are online and might mention that
-    #     else:
-    #         return "Venue information not found"
+    #     print( "Venue:" , find_conference_venue(url) )
+    #     print(f"\n==================================\n")
 
-
-
-    # def get_venue_from_url(url):
-    #     # Fetch the webpage content
-    #     response = requests.get(url)
-    #     soup = BeautifulSoup(response.text, 'html.parser')
-
-    #     # Extract the page text
-    #     page_text = soup.get_text().lower()
-
-    #     # Look for keywords and try to find the venue
-    #     venue_keywords = [r"will take place in", r"held in", r"at", r"hosted in", r"located in"]
-
-    #     for keyword in venue_keywords:
-    #         # Search for the keyword and capture the venue following it
-    #         match = re.search(r'{}.*?([A-Za-z\s,]+(?:[A-Za-z]+(?:\s+\d{4})?))'.format(re.escape(keyword)), page_text)
-    #         if match:
-    #             return match.group(1).strip()  # Return the venue found
-
-    #     # If no venue information found
-    #     return "Venue information not found"
-
-    def get_venue_from_url(url:str) ->str:
-        # Fetch the webpage content
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Extract all text from the page, split into lines
-        paragraphs = soup.find_all(['p', 'div'])  # Common tags that may contain venue info
-        page_text = [para.get_text() for para in paragraphs]
-
-        print("page_text:\n", page_text)
-
-        # Define venue-related keywords to search for
-        venue_keywords = ["venue", "location", "will take place in", "held in", "at", "hosted in", "located in"]
-        
-        # Search each paragraph for venue-related keywords
-        for paragraph in page_text:
-            # If the paragraph contains any of the venue-related keywords, return it
-            if any(keyword in paragraph.lower() for keyword in venue_keywords):
-                return str(paragraph.strip())  # Return the paragraph that contains the venue info
-
-        # If no venue information is found
-        return "Venue information not found"
-
-
-    for url in  test_urls:
-    # for url in extra_urls:
-    # for url in[
-    #     # "https://ijcai24.org/",
-    #     # "http://icaps24.icaps-conference.org/",
-    #     # "https://www.ecai2024.eu/",
-    #     # "https://aaai.org/aaai-24-conference/"
-    #     # "https://setn2024.cs.unipi.gr/"
-    #     # "https://pci2024.uniwa.gr/"
-    #     # "https://www.aamas2024-conference.auckland.ac.nz/"
-    #     # "https://kr.org/KR2024/"
-    #     # "https://sites.google.com/view/cpaior2024"
-    #     # "https://cp2024.a4cp.org/"
-    #     ]: 
-        print(f"Url: {url}")
-        # print("Venue:", get_venue_from_url(url))
-
-        print( "Venue:" , find_conference_venue(url) )
-        print(f"\n==================================\n")
-
-        # break
+    #     # break
 
    
     # main("https://isqua.org/events/istanbul-2024-international-conference.html")
@@ -542,7 +528,7 @@ if __name__ == "__main__":
 
     # main("https://cp2024.a4cp.org/")
 
-    # for url in test_urls:
-    #     main(url)
-    #     print()
+    for url in test_urls:
+        main(url)
+        print()
         # break
