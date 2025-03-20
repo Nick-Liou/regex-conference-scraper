@@ -2,7 +2,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-from typing import Any
+from typing import Any, List
 from typing import Optional
 
 def extract_visible_text(url: str) -> Optional[str]:
@@ -118,7 +118,7 @@ def get_full_conference_name(url :str) -> str:
         return "(" + pattern + ")"
 
     abbreviation = abbreviation.split()[0]
-    print(f"abbreviation = {abbreviation}")
+    print(f"Abbreviation: {abbreviation}")
     # Search for the full name in the page text
     text = soup.get_text()
     # pattern = rf'\b({abbreviation})\b\s+\(([^)]+)\)'
@@ -198,7 +198,7 @@ def find_conference_venue(homepage_url:str) -> str:
         #     venue_url = homepage_url.rstrip('/') + '/' + venue_url.lstrip('/')
 
         venue_url = urljoin(homepage_url, venue_links[0])  # Join relative URLs
-        print(f"venue_url: {venue_url}")
+        # print(f"venue_url: {venue_url}")
 
         venue_response = requests.get(venue_url)
         venue_response.raise_for_status()
@@ -234,9 +234,8 @@ def find_conference_venue(homepage_url:str) -> str:
         return f"Error fetching data: {e}"
 
 
-# https://ijcai24.org/register/
 
-def find_fees(url:str)->str:
+def find_fees(url:str)->list[list[list[str]]] | str:
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -249,7 +248,7 @@ def find_fees(url:str)->str:
     fee_keywords = ['register', 'registration']
     fee_links = [link for link in links if any(keyword in link.lower() for keyword in fee_keywords)]
     
-    print("All fee urls:" , fee_links)
+    # print("All fee urls:" , fee_links)
     if not fee_links:
         return "No fee/registration page found."
     
@@ -258,74 +257,76 @@ def find_fees(url:str)->str:
     
     response = requests.get(fee_url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
-
-
     
     fee_finder = re.compile(r'\b(?:early[\W]|late|standard|onsite|on-site|main conference|regular|(eetn|non eetn"|epy|non-epy)\s(member))\b', re.IGNORECASE)
 
-    # print(soup.find_all(['table'])[0].get_text())
-
-
-    # tables =  [" ".join(p.stripped_strings) if re.findall(fee_finder,p.get_text()) else "" for p in soup.find_all(['table'])]
     tables =  [p if re.findall(fee_finder,p.get_text()) else None for p in soup.find_all(['table'])] 
 
+    
 
     tables_with_fees = []
-    for t in tables:
+    for i,t in enumerate(tables,1):
         if t:
             fee_table = []
-            print("\n\nNew table")
             for row in t.find_all('tr'): 
 
-                row_text = [td.get_text(strip=True) for td in row.find_all(['td','th'])]
-                print(row_text)
+                row_text = [str(td.get_text(strip=True)) for td in row.find_all(['td','th'])]
                 if row_text:
                     fee_table.append(row_text) 
             tables_with_fees.append(fee_table)
     
+
     
-    return "No fees found"
+    if tables_with_fees:
+        return tables_with_fees
+    else:
+        return "No fees were extracted"
+
+
+def print_fees(tables: List[List[List[str]]] | str ) -> None:
+
+    if isinstance(tables, str):
+        print(tables)
+        return 
+    
+
+    for i,table in enumerate(tables,1):
+        print(f"Fee Table {i}:")
+        print_table(convert_lists_to_even_lists(table))
+        print("\n\n")
+
+def convert_lists_to_even_lists(table: List[List[str]]) -> List[List[str]]:
+    max_len = max(len(sub) for sub in table)  # Get max row length
+    
+    return [[""] * (max_len - len(sub)) + sub for sub in table]  # Prepend empty strings
+
+def print_table(data: List[List[str]]) -> None:
+    col_widths = [max(len(row[i]) if i < len(row) else 0 for row in data) for i in range(max(map(len, data)))]
+    
+    for row in data:
+        print("  ".join(cell.ljust(col_widths[i]) if i < len(row) else " " * col_widths[i] for i, cell in enumerate(row)))
+
+
 
 def main(url: str = "") -> None:
     if url == "":
         url = input("Enter the conference website URL: ")
 
     
-    print(f"Current URL: {url}  <=========================================")
-     
+    print(f"Conference URL: {url}")     
 
-    # print("Conference Date :", get_conference_date(url) ) 
+    print("Conference Date :", get_conference_date(url) ) 
 
-    # print("Conference Name :", get_full_conference_name(url))  
+    print("Conference Name :", get_full_conference_name(url))  
 
-    # print("Venue:" , find_conference_venue(url))
+    print("Venue:" , find_conference_venue(url))
+
+    # Fees:
+    print_fees(find_fees(url))
     
-    print("Fees:" , find_fees(url))
-    
-    # <=====================================================
-
-    # html_content = get_conference_page(url)
-    # print(html_content)
-    # if vis_text:
-    #     soup = BeautifulSoup(html_content, 'html.parser')
-    #     text = soup.get_text()
-        
-    #     # Extract dates
-    #     conference_dates = extract_dates(text)
-    #     print("Extracted Dates:", conference_dates)
 
 if __name__ == "__main__":
-
-    # find_fees("https://ijcai24.org/register/")
-    # find_fees("https://icaps24.icaps-conference.org/home/")
-    # find_fees("https://www.ecai2024.eu/registration")
-    # find_fees("https://aaai.org/aaai-24-conference/registration/")
-
-    # find_fees("https://setn2024.cs.unipi.gr/index.php/fees-registration-3/")
-
     
-
-    # test_urls = [ "https://icml.cc/" , "https://nips.cc/"]
     # Example urls
     test_urls =    [
         "https://ijcai24.org/",
@@ -346,31 +347,6 @@ if __name__ == "__main__":
         "https://2024.ieee-icra.org/"
     ]
 
-
-
-    # for url in  test_urls:
-    # # for url in extra_urls:
-    # # for url in[
-    # #     # "https://ijcai24.org/",
-    # #     # "http://icaps24.icaps-conference.org/",
-    # #     # "https://www.ecai2024.eu/",
-    # #     # "https://aaai.org/aaai-24-conference/"
-    # #     # "https://setn2024.cs.unipi.gr/"
-    # #     # "https://pci2024.uniwa.gr/"
-    # #     # "https://www.aamas2024-conference.auckland.ac.nz/"
-    # #     # "https://kr.org/KR2024/"
-    # #     # "https://sites.google.com/view/cpaior2024"
-    # #     # "https://cp2024.a4cp.org/"
-    # #     ]: 
-    #     print(f"Url: {url}")
-    #     # print("Venue:", get_venue_from_url(url))
-
-    #     print( "Venue:" , find_conference_venue(url) )
-    #     print(f"\n==================================\n")
-
-    #     # break
-
-   
     # main("https://isqua.org/events/istanbul-2024-international-conference.html")
     # main("https://2024.ieee-icra.org/")
 
@@ -379,4 +355,3 @@ if __name__ == "__main__":
     for url in test_urls:
         main(url)
         print()
-        # break
