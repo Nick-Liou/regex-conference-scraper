@@ -237,21 +237,27 @@ def find_conference_venue(homepage_url:str) -> str:
 # https://ijcai24.org/register/
 
 def find_fees(url:str)->str:
-    response = requests.get(url)
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
 
     # Find all links on the homepage
     links = [a['href'] for a in soup.find_all('a', href=True)]
+
     
     # Filter links that likely contain venue information
-    fee_keywords = ['register', 'registation']
+    fee_keywords = ['register', 'registration']
     fee_links = [link for link in links if any(keyword in link.lower() for keyword in fee_keywords)]
     
+    print("All fee urls:" , fee_links)
     if not fee_links:
         return "No fee/registration page found."
     
     fee_url = urljoin(url, fee_links[0])  # Join relative URLs
-    print(f"fee_url: {fee_url}")
+    # print(f"fee_url chosen: {fee_url}")
+    
+    response = requests.get(fee_url, headers=headers)
+    soup = BeautifulSoup(response.text, 'html.parser')
 
 
     
@@ -263,37 +269,22 @@ def find_fees(url:str)->str:
     # tables =  [" ".join(p.stripped_strings) if re.findall(fee_finder,p.get_text()) else "" for p in soup.find_all(['table'])]
     tables =  [p if re.findall(fee_finder,p.get_text()) else None for p in soup.find_all(['table'])] 
 
-    # print("tabels is " , tables)
-    # print("len of soup.find_all(['table'])" , len(soup.find_all(['table'])))
-    # # If there isn't tables do something else
-    # if tables == [''] and len(tables) == 1:
-    #     print("hiii")
-    #     return " " 
 
-    fees = []
+    tables_with_fees = []
     for t in tables:
         if t:
-            fee = []
+            fee_table = []
             print("\n\nNew table")
             for row in t.find_all('tr'): 
 
-                row = [td.get_text(strip=True) for td in row.find_all(['td','th'])]
-                # th = [td.get_text(strip=True) for td in row.find_all('th')]
-                # if row is 
-                print(row)
-                if row:
-                    fee.append(row) 
-            fees.append(fee)
+                row_text = [td.get_text(strip=True) for td in row.find_all(['td','th'])]
+                print(row_text)
+                if row_text:
+                    fee_table.append(row_text) 
+            tables_with_fees.append(fee_table)
     
-    # print(fees)
-
-    # fees_tables = [string for string in tables]
-
-    # [link for link in links if any(keyword in link.lower() for keyword in venue_keywords)]
-
-
-
-    return ""
+    
+    return "No fees found"
 
 def main(url: str = "") -> None:
     if url == "":
@@ -305,10 +296,11 @@ def main(url: str = "") -> None:
 
     # print("Conference Date :", get_conference_date(url) ) 
 
-    print("Conference Name :", get_full_conference_name(url))  
+    # print("Conference Name :", get_full_conference_name(url))  
 
     # print("Venue:" , find_conference_venue(url))
     
+    print("Fees:" , find_fees(url))
     
     # <=====================================================
 
@@ -325,6 +317,7 @@ def main(url: str = "") -> None:
 if __name__ == "__main__":
 
     # find_fees("https://ijcai24.org/register/")
+    # find_fees("https://icaps24.icaps-conference.org/home/")
     # find_fees("https://www.ecai2024.eu/registration")
     # find_fees("https://aaai.org/aaai-24-conference/registration/")
 
@@ -380,151 +373,6 @@ if __name__ == "__main__":
    
     # main("https://isqua.org/events/istanbul-2024-international-conference.html")
     # main("https://2024.ieee-icra.org/")
-
-#     print(extract_dates("""
-    
-# HCI International 2024 Conference homepage
-
-#     Home
-#     About
-#     Submissions
-#     Registration
-#     Program
-#     Accommodation
-#     Exhibition
-
-# HCI INTERNATIONAL 2024
-# 26th International Conference on
-# Human-Computer Interaction
-# Washington Hilton Hotel, Washington DC, USA
-# 29 June - 4 July 2024
-# 40 years of HCI International. Join us in Washington DC to celebrate
-# Photos
-
-# Photos from the Conference
-#  AWARDS
-
-#     Papers/Poster
-#     Student Design Competition
-#     WUD: Design Challenge
-
-# Stay connected
-
-# Experience the Conference also through
-
-# Web App
-
-# Mobile App
-# Program
-
-# including detailed schedule for
-
-#     paper presentations
-#     poster presentations
-#     tutorials
-#     workshops
-
-# Tours
-
-# Explore the US Capital through an exclusive tour
-# CMS
-
-# Submissions and registration are handled through the Conference management System
-# HCI MEDAL FOR SOCIETAL IMPACT
-
-# Recipient: Vicki Hanson
-# Medal to be awarded during the HCII2024 Opening Plenary Session
-# KEYNOTE SPEECH
-
-# "Technological Change for Improving Accessibility"
-
-# by Vicki Hanson
-# Participants attending the Conference ‘virtually’ are offered two complimentary TUTORIAL registrations
-
-# (i) the Distinguished Tutorial T13 “Generative AI: With Great Power Comes Great Responsibility” offered by Ben Shneiderman
-
-# (ii) any other Tutorial of their choice
-# The HCI International (HCII) Conference celebrates the World Usability Day and congratulates the Design Challenge 2023 winners!
-
-# November 9, 2023: On this special day, HCII reaffirms its commitment to prioritizing usability, promoting the creation of digital experiences that are beneficial and empowering for everyone. The HCII2024 sponsors the World Usability Initiative Design Challenge 2023 awards and cordially invites the award winners to receive their prizes and present their work during the conference.
-# Thematic Areas & Affiliated Conferences
-
-#     HCI: Human-Computer Interaction Thematic Area
-#     HIMI: Human Interface and the Management of Information Thematic Area
-#     EPCE: 21st International Conference on Engineering Psychology and Cognitive Ergonomics
-#     AC: 18th International Conference on Augmented Cognition
-#     UAHCI: 18th International Conference on Universal Access in Human-Computer Interaction
-#     CCD: 16th International Conference on Cross-Cultural Design
-#     SCSM: 16th International Conference on Social Computing and Social Media
-#     VAMR: 16th International Conference on Virtual, Augmented and Mixed Reality
-#     DHM: 15th International Conference on Digital Human Modeling & Applications in Health, Safety, Ergonomics & Risk Management
-#     DUXU: 13th International Conference on Design, User Experience and Usability
-#     C&C: 12th International Conference on Culture and Computing
-#     DAPI: 12th International Conference on Distributed, Ambient and Pervasive Interactions
-
-#     HCIBGO: 11th International Conference on HCI in Business, Government and Organizations
-#     LCT: 11th International Conference on Learning and Collaboration Technologies
-#     ITAP: 10th International Conference on Human Aspects of IT for the Aged Population
-#     AIS: 6th International Conference on Adaptive Instructional Systems
-#     HCI-CPT: 6th International Conference on HCI for Cybersecurity, Privacy and Trust
-#     HCI-Games: 6th International Conference on HCI in Games
-#     MobiTAS: 6th International Conference on HCI in Mobility, Transport and Automotive Systems
-#     AI-HCI: 5th International Conference on Artificial Intelligence in HCI
-#     MOBILE: 5th International Conference on Human-Centered Design, Operation and Evaluation of Mobile Communications
-
-#     Call for Participation
-#      Download(153KB)
-
-#     PROCEEDINGS
-
-#     Published by:
-
-# About the Conference
-# Google Scholar H5-Index: 38 (last update May 2024)
-
-# HCI International 2024, jointly with the affiliated Conferences, under the auspices of 21 distinguished international boards, to be held under one management and one registration, will take place at Washington Hilton Hotel, Washington DC, USA.
-# HCII2024 will run as a 'hybrid' conference.
-
-
-# The best contributions will be awarded!
-# The best paper of each of the HCII 2024 Thematic Areas / Affiliated Conferences will be given an award. The best poster extended abstract will also receive an award.
-# World Usability Day - Design Challenge 2023
-
-# HCI International 2024 congratulates the winners and sponsors the awards
-
-#     1 July 2024: The Gold and Silver awards, as well as the Honorable Mention (in lieu of a Bronze award) will be conferred during the Opening Plenary Session
-#     2 July 2024: The three awards winners are cordially invited, with complimentary registration, to present their work in a special hybrid session of the Conference
-
-
-# If you have any requests or inquiries regarding accessibility issues, please contact the Conference Administration
-# HCI INTERNATIONAL 2024
-
-#     Contacts
-#     Links
-#     Privacy policy
-#     Terms and Conditions
-
-# HCII2024 CMS
-
-#     Create your account
-#     Submit proposals
-
-# Contact us
-
-#     Conference Administration
-#     administration@2024.hci.international
-#     Program Administration
-#     program@2024.hci.international
-#     Registration Administration
-#     registration@2024.hci.international
-
-#     Washington Hilton Hotel, Washington DC, USA
-#     29 June - 4 July 2024
-
-# SSL site seal - click to verify
-
-
-#     """))
 
     # main("https://cp2024.a4cp.org/")
 
