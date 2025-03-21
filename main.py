@@ -56,11 +56,11 @@ def extract_dates(text:str) -> list[str]:
           
     dates = []
     for pattern in date_patterns:
-        # dates.extend(re.findall(pattern, text, re.IGNORECASE))
         dates.extend([''.join(match) for match in re.findall(pattern, text, re.IGNORECASE)] )
     return dates
 
 
+# Not used 
 def get_conference_name(url :str) -> str:    
     try:
         response = requests.get(url)
@@ -88,7 +88,6 @@ def get_full_conference_name(url :str) -> str:
         title = soup.title.string if soup.title else "No title found"
         
         # Extract potential abbreviation (e.g., "ICML 2024")
-        # match = re.search(r'\b[A-Z]{2,6}\s?\d{4}\b', title)
         match = re.search(r'\b[A-Z]{2,6}(?:\s?\d{4})?\b', title)
         abbreviation = match.group(0) if match else None
 
@@ -111,7 +110,6 @@ def get_full_conference_name(url :str) -> str:
         print(f"Abbreviation: {abbreviation}")
         # Search for the full name in the page text
         text = soup.get_text()
-        # pattern = rf'\b({abbreviation})\b\s+\(([^)]+)\)'
 
         pattern = build_regex(abbreviation)
 
@@ -125,7 +123,6 @@ def get_full_conference_name(url :str) -> str:
                     
             # Apply cleaning
             cleaned_strings = [clean_text(s) for s in matches]
-            # print(cleaned_strings)
 
             from collections import Counter
 
@@ -181,43 +178,21 @@ def find_conference_venue(homepage_url:str) -> str:
         venue_keywords = ['venue', 'location', 'conference-center', 'hotel']
         venue_links = [link for link in links if any(keyword in link.lower() for keyword in venue_keywords)]
         
-        # print(f"venue_links: {venue_links}")
         if not venue_links:
             return "No venue page found."
-        
-        # Visit the first likely venue link
-        # venue_url = venue_links[0]
-        # if not venue_url.startswith('http'):
-        #     venue_url = homepage_url.rstrip('/') + '/' + venue_url.lstrip('/')
+                
 
         venue_url = urljoin(homepage_url, venue_links[0])  # Join relative URLs
-        # print(f"venue_url: {venue_url}")
-
+        
         venue_response = requests.get(venue_url)
         venue_response.raise_for_status()
         venue_soup = BeautifulSoup(venue_response.text, 'html.parser')
         
-        # Extract venue details using heuristics
-        # venue_text = venue_soup.get_text()
-        # print("venue_text: \n", venue_text)
-        # venue_match = re.search(r'(?i)(venue|location):\s*(.+)', venue_text)
-
-        # venue_text = [line.strip() for line in venue_soup.stripped_strings]
-        # print("venue_text: \n", venue_text)
-        # venue_match = next((line for line in venue_text if re.search(r'(?i)(will take place in|is being held at|will be held at)', line)), None)
-        # print("venue_match old:" , venue_match)
-
         # Extract venue details preserving structure
-        paragraphs = [" ".join(p.stripped_strings) for p in venue_soup.find_all(['p','pre','span'])]
-        # print("paragraphs: \n", paragraphs)
-        
-
-
+        paragraphs = [" ".join(p.stripped_strings) for p in venue_soup.find_all(['p','pre','span'])]      
         
         venue_match = next((line for line in paragraphs if re.search(r'(?i)(will take place in|is being held at|will be held at|(the)? venue is|venue of the main conference is|will be located at)', line)), None)
-        # print("venue_match from paragraphs:" , venue_match)
-        
-        
+                
         if venue_match:
             return venue_match
         else:
@@ -243,12 +218,10 @@ def find_fees(url:str)->list[list[list[str]]] | str:
         fee_keywords = ['register', 'registration']
         fee_links = [link for link in links if any(keyword in link.lower() for keyword in fee_keywords)]
         
-        # print("All fee urls:" , fee_links)
         if not fee_links:
             return "No fee/registration page found."
         
         fee_url = urljoin(url, fee_links[0])  # Join relative URLs
-        # print(f"fee_url chosen: {fee_url}")
         
         response = requests.get(fee_url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -256,9 +229,7 @@ def find_fees(url:str)->list[list[list[str]]] | str:
         fee_finder = re.compile(r'\b(?:early[\W]|late|standard|onsite|on-site|main conference|regular|(eetn|non eetn"|epy|non-epy)\s(member))\b', re.IGNORECASE)
 
         tables =  [p if re.findall(fee_finder,p.get_text()) else None for p in soup.find_all(['table'])] 
-
         
-
         tables_with_fees = []
         for i,t in enumerate(tables,1):
             if t:
@@ -310,7 +281,6 @@ def print_table(data: List[List[str]]) -> None:
 def main(url: str = "") -> None:
     if url == "":
         url = input("Enter the conference website URL: ")
-
     
     print(f"Conference URL: {url}")     
 
