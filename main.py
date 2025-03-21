@@ -37,16 +37,6 @@ def extract_visible_text(url: str) -> Optional[str]:
         return None
 
 
-def get_conference_page(url:str) -> str|None:
-    """Fetches the main page content of the given conference URL."""
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()   
-        return str(response.text)
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching the URL: {e}")
-        return None
-
 def extract_dates(text:str) -> list[str]:
     """Extract conference dates using regex."""
    
@@ -326,7 +316,9 @@ def main(url: str = "") -> None:
     
 
 if __name__ == "__main__":
-    
+
+    main()
+
     # Example urls
     test_urls =    [
         "https://ijcai24.org/",
@@ -341,17 +333,7 @@ if __name__ == "__main__":
         "https://cp2024.a4cp.org/"
     ]
 
-    extra_urls = [
-        "https://2024.hci.international/",
-        "https://isqua.org/events/istanbul-2024-international-conference.html",
-        "https://2024.ieee-icra.org/"
-    ]
-
-    # main("https://isqua.org/events/istanbul-2024-international-conference.html")
-    # main("https://2024.ieee-icra.org/")
-
-    # main("https://cp2024.a4cp.org/")
-
-    for url in test_urls:
-        main(url)
-        print()
+    # Run for all test urls
+    # for url in test_urls:
+    #     main(url)
+    #     print()
