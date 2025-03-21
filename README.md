@@ -2,12 +2,11 @@
 [![Tests](https://github.com/Nick-Liou/regex-conference-scraper/actions/workflows/pytest.yml/badge.svg)](https://github.com/Nick-Liou/regex-conference-scraper/actions/workflows/pytest.yml)
 
 # Natural Language Processing, MSc in Artificial Intelligence and Data Analytics, 2024-25
-Exercise 1
+Exercise 1 Regular Expressions
+ 
+Given the main URL of an international conference, this program extracts key details such as the conference name, abbreviation, dates, venue, and registration fees.
  
  
- 
- 
-
 
 ## Installation
 
