@@ -38,21 +38,13 @@ def extract_visible_text(url: str) -> Optional[str]:
 
 
 def extract_dates(text:str) -> list[str]:
-    """Extract conference dates using regex."""
+    """Extract dates using regex."""
    
     month = r'(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\.?'
     day = r'\d{1,2}(?:st|nd|rd|th)?'
     dash_day = fr'(?:\s?[-–]\s?{day})'
     year = r'(?:\d{4})'
-
-    # # Use double {{ }} to work properly with the f string 
-    # sub_pattern = r'(\d{1,2})([./])(\d{1,2})(\2\d{2,4})?\b'
-    # date_patterns = [
-    #     fr'{sub_pattern}(\s?-\s?\d{{1,2}}\2\d{{1,2}}(?:\2\d{{2,4}})?)?(?!\s?{month})' , #(Doesn't end with a month)
-    #     fr'{month}\s?{day}{dash_day}?(?:\s*,?\s*{year})?',
-    #     fr'{day}{dash_day}?\s?{month}(?:\s*,?\s*{year})?'
-    # ]
-    
+   
     # Use double {{ }} to work properly with the f string 
     ref_index = 2
     sub_pattern = fr'\d{{1,2}}([./])\d{{1,2}}\{ref_index}\d{{2,4}}?'
@@ -69,79 +61,90 @@ def extract_dates(text:str) -> list[str]:
     return dates
 
 
-def get_conference_name(url :str) -> str:
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # Extract the title tag
-    title = soup.title.string if soup.title else "No title found"
-    
-    return title.strip()
+def get_conference_name(url :str) -> str:    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raises an error for bad responses (4xx and 5xx)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Extract the title tag
+        title = soup.title.string if soup.title else "No title found"
+        
+        return title.strip()
+        
+    except requests.RequestException as e:
+        print(f"Error fetching the webpage: {e}")
+        return f"Error fetching the webpage: {e}"
 
 def get_full_conference_name(url :str) -> str:
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raises an error for bad responses (4xx and 5xx)
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-    
-    # Extract the title
-    title = soup.title.string if soup.title else "No title found"
-    
-    # Extract potential abbreviation (e.g., "ICML 2024")
-    # match = re.search(r'\b[A-Z]{2,6}\s?\d{4}\b', title)
-    match = re.search(r'\b[A-Z]{2,6}(?:\s?\d{4})?\b', title)
-    abbreviation = match.group(0) if match else None
-
-    if not abbreviation:
-        return title.strip()  # Return the title if no abbreviation is found
-    
-    def build_regex(abbreviation:str)->str:
-        words = list(abbreviation)  # Split abbreviation into letters
-        pattern = r""  # Word boundary
         
-        for i, letter in enumerate(words):
-            if i > 0:
-                pattern += r",?-?\s*(?:(?:on|of|for|and|in|for the)\s+)?"  # Optional connective words
-            pattern += rf"\b{letter}\w+\b"  # Match a word starting with the letter
+        # Extract the title
+        title = soup.title.string if soup.title else "No title found"
+        
+        # Extract potential abbreviation (e.g., "ICML 2024")
+        # match = re.search(r'\b[A-Z]{2,6}\s?\d{4}\b', title)
+        match = re.search(r'\b[A-Z]{2,6}(?:\s?\d{4})?\b', title)
+        abbreviation = match.group(0) if match else None
 
-        pattern += r""  # Word boundary
-        return "(" + pattern + ")"
+        if not abbreviation:
+            return title.strip()  # Return the title if no abbreviation is found
+        
+        def build_regex(abbreviation:str)->str:
+            words = list(abbreviation)  # Split abbreviation into letters
+            pattern = r""  # Word boundary
+            
+            for i, letter in enumerate(words):
+                if i > 0:
+                    pattern += r",?-?\s*(?:(?:on|of|for|and|in|for the)\s+)?"  # Optional connective words
+                pattern += rf"\b{letter}\w+\b"  # Match a word starting with the letter
 
-    abbreviation = abbreviation.split()[0]
-    print(f"Abbreviation: {abbreviation}")
-    # Search for the full name in the page text
-    text = soup.get_text()
-    # pattern = rf'\b({abbreviation})\b\s+\(([^)]+)\)'
+            pattern += r""  # Word boundary
+            return "(" + pattern + ")"
 
-    pattern = build_regex(abbreviation)
+        abbreviation = abbreviation.split()[0]
+        print(f"Abbreviation: {abbreviation}")
+        # Search for the full name in the page text
+        text = soup.get_text()
+        # pattern = rf'\b({abbreviation})\b\s+\(([^)]+)\)'
 
-    matches = [''.join(match) for match in re.findall(pattern, text, re.IGNORECASE)] 
+        pattern = build_regex(abbreviation)
+
+        matches = [''.join(match) for match in re.findall(pattern, text, re.IGNORECASE)] 
 
 
-    if matches:
-        def clean_text(s:str)->str:
-            return re.sub(r'[\s\xa0]+', ' ', s).strip()  # Replace all whitespace-like chars with a single space
+        if matches:
+            def clean_text(s:str)->str:
+                return re.sub(r'[\s\xa0]+', ' ', s).strip()  # Replace all whitespace-like chars with a single space
 
+                    
+            # Apply cleaning
+            cleaned_strings = [clean_text(s) for s in matches]
+            # print(cleaned_strings)
+
+            from collections import Counter
+
+            def most_frequent_string(strings:list[str]) -> str:
+                # Create a Counter object to count occurrences
+                counter = Counter(strings)
                 
-        # Apply cleaning
-        cleaned_strings = [clean_text(s) for s in matches]
-        # print(cleaned_strings)
+                # Find the most common element
+                most_common = counter.most_common(1)  # Returns a list of tuples (item, count)
+                
+                return most_common[0][0]  # Return the string with the highest count
 
-        from collections import Counter
+            return most_frequent_string(cleaned_strings)
+        
+        return title.strip()
+    except requests.RequestException as e:
+        print(f"Error fetching the webpage: {e}")
+        return f"Error fetching the webpage: {e}"
 
-        def most_frequent_string(strings:list[str]) -> str:
-            # Create a Counter object to count occurrences
-            counter = Counter(strings)
-            
-            # Find the most common element
-            most_common = counter.most_common(1)  # Returns a list of tuples (item, count)
-            
-            return most_common[0][0]  # Return the string with the highest count
-
-        return most_frequent_string(cleaned_strings)
-    
-    return title.strip()
-    
 
 def get_conference_date(url :str) -> str:
 
@@ -226,51 +229,57 @@ def find_conference_venue(homepage_url:str) -> str:
 
 
 def find_fees(url:str)->list[list[list[str]]] | str:
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raises an error for bad responses (4xx and 5xx)
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-    # Find all links on the homepage
-    links = [a['href'] for a in soup.find_all('a', href=True)]
+        # Find all links on the homepage
+        links = [a['href'] for a in soup.find_all('a', href=True)]
 
-    
-    # Filter links that likely contain venue information
-    fee_keywords = ['register', 'registration']
-    fee_links = [link for link in links if any(keyword in link.lower() for keyword in fee_keywords)]
-    
-    # print("All fee urls:" , fee_links)
-    if not fee_links:
-        return "No fee/registration page found."
-    
-    fee_url = urljoin(url, fee_links[0])  # Join relative URLs
-    # print(f"fee_url chosen: {fee_url}")
-    
-    response = requests.get(fee_url, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    fee_finder = re.compile(r'\b(?:early[\W]|late|standard|onsite|on-site|main conference|regular|(eetn|non eetn"|epy|non-epy)\s(member))\b', re.IGNORECASE)
+        
+        # Filter links that likely contain venue information
+        fee_keywords = ['register', 'registration']
+        fee_links = [link for link in links if any(keyword in link.lower() for keyword in fee_keywords)]
+        
+        # print("All fee urls:" , fee_links)
+        if not fee_links:
+            return "No fee/registration page found."
+        
+        fee_url = urljoin(url, fee_links[0])  # Join relative URLs
+        # print(f"fee_url chosen: {fee_url}")
+        
+        response = requests.get(fee_url, headers=headers)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        fee_finder = re.compile(r'\b(?:early[\W]|late|standard|onsite|on-site|main conference|regular|(eetn|non eetn"|epy|non-epy)\s(member))\b', re.IGNORECASE)
 
-    tables =  [p if re.findall(fee_finder,p.get_text()) else None for p in soup.find_all(['table'])] 
+        tables =  [p if re.findall(fee_finder,p.get_text()) else None for p in soup.find_all(['table'])] 
 
-    
+        
 
-    tables_with_fees = []
-    for i,t in enumerate(tables,1):
-        if t:
-            fee_table = []
-            for row in t.find_all('tr'): 
+        tables_with_fees = []
+        for i,t in enumerate(tables,1):
+            if t:
+                fee_table = []
+                for row in t.find_all('tr'): 
 
-                row_text = [str(td.get_text(strip=True)) for td in row.find_all(['td','th'])]
-                if row_text:
-                    fee_table.append(row_text) 
-            tables_with_fees.append(fee_table)
-    
+                    row_text = [str(td.get_text(strip=True)) for td in row.find_all(['td','th'])]
+                    if row_text:
+                        fee_table.append(row_text) 
+                tables_with_fees.append(fee_table)
+        
 
-    
-    if tables_with_fees:
-        return tables_with_fees
-    else:
-        return "No fees were extracted"
+        
+        if tables_with_fees:
+            return tables_with_fees
+        else:
+            return "No fees were extracted"
+    except requests.RequestException as e:
+        print(f"Error fetching the webpage: {e}")
+        return f"Error fetching the webpage: {e}"
+
 
 
 def print_fees(tables: List[List[List[str]]] | str ) -> None:
